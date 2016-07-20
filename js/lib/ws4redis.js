@@ -42,12 +42,17 @@ function WS4Redis(options) {
   function onClose() {
     console.log("Connection closed!");
     if(!timer) {
-      // try to reconnect
-      var interval = generateInteval(attempts);
-      timer = setTimeout(function() {
-        attempts += 1;
-        connect(ws.url);
-      }, interval);
+      if(attempts > 5) {
+        return options.onClose();
+      }
+      else {
+        // try to reconnect
+        var interval = generateInteval(attempts);
+        timer = setTimeout(function() {
+          attempts += 1;
+          connect(ws.url);
+        }, interval);
+      }
     }
   }
 

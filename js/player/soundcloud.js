@@ -7,7 +7,7 @@ soundcloudPreviewPlayer.initialized = false;
 
 soundcloudPlayer.bind(SC.Widget.Events.READY, function() {
   soundcloudPlayer.initialized = true;
-  if(Cookies.get('playerOpen') && Cookies.get('playerOpen') === "true" && roomVM.room().currentMusic() && roomVM.room().currentMusic().source() === "soundcloud") {
+  if(getCookie('playerOpen') && getCookie('playerOpen') === "true" && roomVM.room() && roomVM.room().currentMusic() && roomVM.room().currentMusic().source() === "soundcloud") {
     roomVM.openPlayer();
   }
 });
@@ -16,32 +16,36 @@ soundcloudPreviewPlayer.bind(SC.Widget.Events.READY, function() {
 });
 
 soundcloudPlayer.bind(SC.Widget.Events.ERROR, function() {
-  console.error("Soundcloud error occured");
+  if($('iframe#soundcloudPlayer').is(":visible")) {
+    console.error("Soundcloud error occured");
+  }
 });
 soundcloudPreviewPlayer.bind(SC.Widget.Events.ERROR, function() {
-  console.error("Soundcloud error occured");
+  if($('iframe#soundcloudPreviewPlayer').is(":visible")) {
+    console.error("Soundcloud error occured");
+  }
 });
 
 var soundcloudPlayerControl = {
   play: function(options) {
     if(soundcloudPlayer.initialized) {
-      $('#wrapper-soundcloud-player').stop().fadeIn(250);
-      soundcloudPlayer.bind(SC.Widget.Events.PLAY, function() {
-        soundcloudPlayer.seekTo(options.timer_start * 1000 || 0);
-        soundcloudPlayer.unbind(SC.Widget.Events.PLAY);
-      });
       soundcloudPlayer.load(
         'https://api.soundcloud.com/tracks/' + options.music_id,
         {
           buying: false,
           visual: true,
           hide_related: true,
-          auto_play: true,
+          auto_play: false,
           callback: function() {
-            soundcloudPlayer.setVolume(Cookies.get('volumePlayer') / 100);
+            soundcloudPlayer.setVolume(getCookie('volumePlayer') / 100);
+            soundcloudPlayer.play();
+            $('#wrapper-soundcloud-player').stop().fadeIn(250);
           },
         }
-        );
+      );
+      soundcloudPlayer.bind(SC.Widget.Events.PLAY, function() {
+        soundcloudPlayer.seekTo(options.timer_start * 1000 || 0);
+      });
     }
   },
   stop: function() {

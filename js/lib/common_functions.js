@@ -2,41 +2,71 @@
 INIT VARS
 INIT AJAX CSRF
 ********************/
-var domainAPI = "http://music-test.amoki.fr";
-
-$.ajaxPrefilter(function(options) {
-  options.url = domainAPI + options.url;
-});
-
-if(!Cookies.get('volumePlayer')) {
-  Cookies.set('volumePlayer', 10);
+var storeCookie = null;
+var getCookie = null;
+var removeCookie = null;
+if(typeof(Storage) !== "undefined") {
+  storeCookie = new Function('key', 'value', 'localStorage.setItem(key, value);');
+  getCookie = new Function('key', 'return localStorage.getItem(key);');
+  removeCookie = new Function('key', 'localStorage.removeItem(key);');
 }
+else {
+  storeCookie = new Function('key', 'value', 'Cookies.set(key, value, {expires: 7});');
+  getCookie = new Function('key', 'return Cookies.get(key);');
+  removeCookie = new Function('key', 'Cookies.remove(key);');
+}
+
+if(!getCookie('volumePlayer')) {
+  storeCookie('volumePlayer', 10);
+}
+
 var ws4redis;
-function setRoomConnexion(token, heartbeat, wsUri) {
-  Cookies.set('room_token', token);
-  Cookies.set('room_heartbeat', heartbeat);
-  Cookies.set('room_wsUri', wsUri);
-  $.ajaxSetup({
-    beforeSend: function(xhr, settings) {
-      xhr.setRequestHeader("Authorization", "Bearer " + token);
-    }
-  });
+function connectWs(token, uri, heartbeat) {
   if(typeof(ws4redis) === "object") {
     ws4redis.close();
   }
   ws4redis = new WS4Redis({
-    uri: wsUri + token + '?subscribe-broadcast',
+    uri: uri + token + '?subscribe-broadcast',
     onMessage: receiveMessage,
     heartbeat: heartbeat,
     onOpen: onWsOpen,
     onError: onWsError,
+    onClose: onWsClose,
   });
 }
 
+function setRoomConnexion(token, heartbeat, wsUri) {
+  storeCookie('room_token', token);
+  $.ajaxSetup({
+    beforeSend: function(xhr) {
+      xhr.setRequestHeader("Authorization", "Bearer " + token);
+    }
+  });
+  if(heartbeat && wsUri) {
+    storeCookie('room_heartbeat', heartbeat);
+    storeCookie('room_wsUri', wsUri);
+    connectWs(getCookie('room_token'), getCookie('room_wsUri'), getCookie('room_heartbeat'));
+  }
+  else {
+    $.getJSON("/check_credentials",
+      function(data) {
+        loginVM.isConnected(true);
+        storeCookie('room_heartbeat', data.heartbeat);
+        storeCookie('room_wsUri', data.uri);
+        connectWs(token, data.uri, data.heartbeat);
+      }).fail(function(jqxhr) {
+        loginVM.badLogin(true);
+        console.error(jqxhr.responseText);
+        return false;
+      }
+    );
+  }
+}
+
 function logOutRoom() {
-  Cookies.remove('room_token');
-  Cookies.remove('room_heartbeat');
-  Cookies.remove('room_wsUri');
+  removeCookie('room_token');
+  removeCookie('room_heartbeat');
+  removeCookie('room_wsUri');
   ws4redis.close();
 }
 
@@ -100,6 +130,15 @@ jQuery.fn.opacityToggle = function() {
     return (opacity === 1) ? 0 : 1;
   });
 };
+
+function arrayFirstIndexOf(array, predicate, predicateOwner) {
+  for(var i = 0, j = array.length; i < j; i++) {
+    if(predicate.call(predicateOwner, array[i])) {
+      return i;
+    }
+  }
+  return -1;
+}
 
 function humanizeSeconds(s) {
   var fm = [
