@@ -2,6 +2,11 @@
 INIT VARS
 INIT AJAX CSRF
 ********************/
+var domainAPI = "http://music-test.amoki.fr"; 
+$.ajaxPrefilter(function(options) {
+  options.url = domainAPI + options.url;
+});
+
 var storeCookie = null;
 var getCookie = null;
 var removeCookie = null;
